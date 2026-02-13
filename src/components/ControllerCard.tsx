@@ -50,7 +50,7 @@ export default function ControllerCard({
       </div>
 
       <div className="card-slot-badge">
-        <span>{slot}</span>
+        <span>P{slot + 1}</span>
       </div>
 
       <div className="card-icon">{deviceIcon(device.device_type)}</div>

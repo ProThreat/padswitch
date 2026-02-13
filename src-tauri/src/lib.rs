@@ -5,6 +5,7 @@ mod error;
 mod hidhide;
 mod input_loop;
 mod platform;
+mod setupdi;
 mod state;
 mod tray;
 mod vigem;
@@ -15,9 +16,11 @@ use state::AppState;
 pub fn run() {
     env_logger::init();
 
+    let manager = platform::create_platform();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(AppState::new())
+        .manage(AppState::new(manager))
         .invoke_handler(tauri::generate_handler![
             commands::get_connected_devices,
             commands::check_driver_status,

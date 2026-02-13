@@ -24,10 +24,13 @@ export interface DriverStatus {
   vigembus_version: string | null;
 }
 
+export type RoutingMode = "Minimal" | "Force";
+
 export interface Profile {
   id: string;
   name: string;
   assignments: SlotAssignment[];
+  routing_mode: RoutingMode;
 }
 
 export interface Settings {

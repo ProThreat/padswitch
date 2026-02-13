@@ -5,6 +5,7 @@ import type {
   SlotAssignment,
   Profile,
   Settings,
+  RoutingMode,
 } from "../types/controller";
 
 // Device discovery
@@ -31,8 +32,8 @@ export const isForwarding = () => invoke<boolean>("is_forwarding");
 // Profiles
 export const getProfiles = () => invoke<Profile[]>("get_profiles");
 
-export const saveProfile = (name: string, assignments: SlotAssignment[]) =>
-  invoke<Profile>("save_profile", { name, assignments });
+export const saveProfile = (name: string, assignments: SlotAssignment[], routingMode: RoutingMode) =>
+  invoke<Profile>("save_profile", { name, assignments, routingMode });
 
 export const deleteProfile = (profileId: string) =>
   invoke<void>("delete_profile", { profileId });

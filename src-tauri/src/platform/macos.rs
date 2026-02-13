@@ -1,20 +1,18 @@
 use crate::device::{DeviceType, DriverStatus, GamepadState, PhysicalDevice};
 use crate::error::{PadSwitchError, Result};
-use crate::platform::ControllerManager;
+use crate::platform::{DeviceEnumerator, DeviceHider, VirtualControllerManager};
 
-/// macOS stub — returns mock data for development/testing.
-/// Real macOS support (IOKit/GameController framework) is a future goal.
-pub struct MacOSControllerManager;
+/// macOS stub -- returns mock data for development/testing.
+pub struct MacOSPlatform;
 
-impl MacOSControllerManager {
+impl MacOSPlatform {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl ControllerManager for MacOSControllerManager {
+impl DeviceEnumerator for MacOSPlatform {
     fn enumerate_devices(&self) -> Result<Vec<PhysicalDevice>> {
-        // Return mock devices for UI development
         Ok(vec![
             PhysicalDevice {
                 id: "mock-wooting-60he".into(),
@@ -50,7 +48,6 @@ impl ControllerManager for MacOSControllerManager {
     }
 
     fn check_drivers(&self) -> Result<DriverStatus> {
-        // On macOS, report drivers as "installed" so the UI doesn't show warnings during dev
         Ok(DriverStatus {
             hidhide_installed: true,
             vigembus_installed: true,
@@ -58,7 +55,9 @@ impl ControllerManager for MacOSControllerManager {
             vigembus_version: Some("(mock — macOS dev mode)".into()),
         })
     }
+}
 
+impl DeviceHider for MacOSPlatform {
     fn hide_device(&self, instance_path: &str) -> Result<()> {
         log::info!("[macOS stub] hide_device: {}", instance_path);
         Ok(())
@@ -73,7 +72,9 @@ impl ControllerManager for MacOSControllerManager {
         log::info!("[macOS stub] whitelist_self");
         Ok(())
     }
+}
 
+impl VirtualControllerManager for MacOSPlatform {
     fn create_virtual_controller(&self) -> Result<u32> {
         Err(PadSwitchError::PlatformNotSupported(
             "Virtual controllers not available on macOS".into(),

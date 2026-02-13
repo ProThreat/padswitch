@@ -41,6 +41,20 @@ impl PhysicalDevice {
             product_id: 0,
         }
     }
+
+    /// Create a PhysicalDevice representing a connected XInput slot.
+    pub fn from_xinput_slot(slot: u32) -> Self {
+        Self {
+            id: format!("xinput-{}", slot),
+            name: format!("XInput Controller (Slot {})", slot),
+            instance_path: format!("XINPUT\\SLOT{}", slot),
+            device_type: DeviceType::XInput,
+            hidden: false,
+            connected: true,
+            vendor_id: 0,
+            product_id: 0,
+        }
+    }
 }
 
 /// Represents the user's desired mapping: physical device → virtual XInput slot

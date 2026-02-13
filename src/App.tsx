@@ -1,103 +1,54 @@
-import { useState, useEffect, useCallback } from "react";
-import { arrayMove } from "@dnd-kit/sortable";
-import type {
-  PhysicalDevice,
-  DriverStatus as DriverStatusType,
-} from "./types/controller";
-import {
-  getConnectedDevices,
-  checkDriverStatus,
-  toggleDevice,
-  applyAssignments,
-  startForwarding,
-  stopForwarding,
-  isForwarding,
-} from "./lib/ipc";
+import { useState } from "react";
+import { usePadSwitch } from "./hooks/usePadSwitch";
 import ControllerList from "./components/ControllerList";
 import DriverStatus from "./components/DriverStatus";
 import StatusBar from "./components/StatusBar";
 import AboutPanel from "./components/AboutPanel";
+import PresetList from "./components/PresetList";
+import type { RoutingMode } from "./types/controller";
 import "./App.css";
 
+type Tab = "presets" | "manual";
+
 function App() {
-  const [devices, setDevices] = useState<PhysicalDevice[]>([]);
-  const [driverStatus, setDriverStatus] = useState<DriverStatusType | null>(
-    null
-  );
-  const [forwarding, setForwarding] = useState(false);
+  const {
+    devices,
+    driverStatus,
+    profiles,
+    activeProfileId,
+    routingMode,
+    setRoutingMode,
+    forwarding,
+    loading,
+    error,
+    refresh,
+    dismissError,
+    handleReorder,
+    handleToggle,
+    handleStartStop,
+    handleSaveProfile,
+    handleActivateProfile,
+    handleDeleteProfile,
+  } = usePadSwitch();
+
+  const [tab, setTab] = useState<Tab>("presets");
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [savePresetName, setSavePresetName] = useState("");
 
-  const refresh = useCallback(async () => {
-    try {
-      const [devs, drivers, fwd] = await Promise.all([
-        getConnectedDevices(),
-        checkDriverStatus(),
-        isForwarding(),
-      ]);
-      setDevices(devs);
-      setDriverStatus(drivers);
-      setForwarding(fwd);
-    } catch (err) {
-      console.error("Failed to refresh:", err);
-    }
-  }, []);
+  if (loading) {
+    return (
+      <div className="app">
+        <div className="loading-state">Loading...</div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const handleReorder = useCallback(
-    (activeId: string, overId: string) => {
-      setDevices((prev) => {
-        const oldIndex = prev.findIndex((d) => d.id === activeId);
-        const newIndex = prev.findIndex((d) => d.id === overId);
-        const reordered = arrayMove(prev, oldIndex, newIndex);
-
-        // Send updated assignments to backend
-        const assignments = reordered.map((d, i) => ({
-          device_id: d.id,
-          slot: i,
-          enabled: !d.hidden,
-        }));
-        applyAssignments(assignments).catch(console.error);
-
-        return reordered;
-      });
-    },
-    []
-  );
-
-  const handleToggle = useCallback(async (deviceId: string, hidden: boolean) => {
-    try {
-      await toggleDevice(deviceId, hidden);
-      setDevices((prev) =>
-        prev.map((d) => (d.id === deviceId ? { ...d, hidden } : d))
-      );
-    } catch (err) {
-      console.error("Failed to toggle device:", err);
-    }
-  }, []);
-
-  const handleStartStop = useCallback(async () => {
-    try {
-      if (forwarding) {
-        await stopForwarding();
-        setForwarding(false);
-      } else {
-        // Apply current order as assignments before starting
-        const assignments = devices.map((d, i) => ({
-          device_id: d.id,
-          slot: i,
-          enabled: !d.hidden,
-        }));
-        await applyAssignments(assignments);
-        await startForwarding();
-        setForwarding(true);
-      }
-    } catch (err) {
-      console.error("Forwarding error:", err);
-    }
-  }, [forwarding, devices]);
+  async function handleSaveAsPreset() {
+    const trimmed = savePresetName.trim();
+    if (!trimmed) return;
+    await handleSaveProfile(trimmed, routingMode);
+    setSavePresetName("");
+  }
 
   return (
     <div className="app">
@@ -112,19 +63,92 @@ function App() {
         </button>
       </header>
 
+      {error && (
+        <div className="error-banner">
+          <span>{error}</span>
+          <button className="btn btn-ghost" onClick={dismissError}>
+            x
+          </button>
+        </div>
+      )}
+
       <DriverStatus status={driverStatus} />
 
-      <div className="app-body">
-        <div className="section-header">
-          <h2>Controllers</h2>
-          <p className="section-hint">Drag to reorder XInput slots</p>
-        </div>
+      <nav className="tab-bar">
+        <button
+          className={`tab-btn${tab === "presets" ? " tab-active" : ""}`}
+          onClick={() => setTab("presets")}
+        >
+          Presets
+        </button>
+        <button
+          className={`tab-btn${tab === "manual" ? " tab-active" : ""}`}
+          onClick={() => setTab("manual")}
+        >
+          Manual
+        </button>
+      </nav>
 
-        <ControllerList
-          devices={devices}
-          onReorder={handleReorder}
-          onToggle={handleToggle}
-        />
+      <div className="app-body">
+        {tab === "presets" && (
+          <PresetList
+            profiles={profiles}
+            activeProfileId={activeProfileId}
+            onActivate={handleActivateProfile}
+            onDelete={handleDeleteProfile}
+          />
+        )}
+
+        {tab === "manual" && (
+          <>
+            <div className="section-header">
+              <h2>Controllers</h2>
+              <p className="section-hint">Drag to set P1-P4 slot order</p>
+            </div>
+
+            <ControllerList
+              devices={devices}
+              onReorder={handleReorder}
+              onToggle={handleToggle}
+            />
+
+            <section className="save-preset-section">
+              <div className="section-header">
+                <h2>Save as preset</h2>
+              </div>
+              <div className="save-preset-row">
+                <input
+                  type="text"
+                  value={savePresetName}
+                  onChange={(e) => setSavePresetName(e.target.value)}
+                  placeholder="e.g. Wooting + Controller"
+                  maxLength={64}
+                />
+                <select
+                  value={routingMode}
+                  onChange={(e) =>
+                    setRoutingMode(e.target.value as RoutingMode)
+                  }
+                >
+                  <option value="Minimal">Minimal</option>
+                  <option value="Force">Force</option>
+                </select>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveAsPreset}
+                  disabled={savePresetName.trim().length === 0}
+                >
+                  Save
+                </button>
+              </div>
+              {routingMode === "Force" && (
+                <p className="mode-warning">
+                  Requires HidHide + ViGEmBus. May conflict with Steam Input.
+                </p>
+              )}
+            </section>
+          </>
+        )}
       </div>
 
       <StatusBar

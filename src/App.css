@@ -94,6 +94,174 @@ body {
   color: var(--text-muted);
 }
 
+/* === Tab Bar === */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.tab-btn {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab-btn:hover {
+  color: var(--text-secondary);
+}
+
+.tab-btn.tab-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* === Preset Grid === */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.preset-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.preset-card:hover {
+  background: var(--bg-card-hover);
+}
+
+.preset-card.preset-active {
+  border-color: var(--accent);
+}
+
+.preset-card-body {
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.preset-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preset-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.preset-mode {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+
+.preset-slots {
+  color: var(--text-muted);
+}
+
+.preset-badge {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.preset-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.preset-card:hover .preset-delete {
+  opacity: 1;
+}
+
+.preset-delete:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* === Save Preset Section === */
+.save-preset-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.save-preset-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.save-preset-row input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.save-preset-row input:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+}
+
+.save-preset-row select {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.mode-warning {
+  font-size: 12px;
+  color: var(--warning);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 /* === Controller List === */
 .controller-list {
   display: flex;
@@ -503,6 +671,29 @@ body {
   width: 100%;
 }
 
+/* === Error Banner === */
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #3b1a1a;
+  border-bottom: 1px solid #5c2a2a;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* === Loading State === */
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
 /* === Scrollbar === */
 .app-body::-webkit-scrollbar {
   width: 6px;
@@ -519,4 +710,24 @@ body {
 
 .app-body::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+@media (max-width: 720px) {
+  .preset-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .save-preset-row {
+    flex-wrap: wrap;
+  }
+
+  .status-bar {
+    flex-wrap: wrap;
+  }
+
+  .status-info {
+    text-align: left;
+    order: 3;
+    width: 100%;
+  }
 }

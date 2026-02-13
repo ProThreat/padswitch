@@ -3,11 +3,20 @@ use crate::error::{PadSwitchError, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum RoutingMode {
+    #[default]
+    Minimal,
+    Force,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
     pub id: String,
     pub name: String,
     pub assignments: Vec<SlotAssignment>,
+    #[serde(default)]
+    pub routing_mode: RoutingMode,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

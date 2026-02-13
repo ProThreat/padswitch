@@ -1,36 +1,33 @@
 use crate::device::{DriverStatus, GamepadState, PhysicalDevice};
 use crate::error::Result;
+use std::sync::Arc;
 
-/// Platform-specific controller management operations.
-/// Implementations live in windows.rs / macos.rs / linux.rs.
-pub trait ControllerManager: Send + Sync {
-    /// Enumerate currently connected physical game controllers.
+/// Enumerate connected physical game controllers and check driver status.
+pub trait DeviceEnumerator: Send + Sync {
     fn enumerate_devices(&self) -> Result<Vec<PhysicalDevice>>;
-
-    /// Check if required drivers (HidHide, ViGEmBus) are installed.
     fn check_drivers(&self) -> Result<DriverStatus>;
+}
 
-    /// Hide a physical device from other applications (via HidHide on Windows).
+/// Hide/unhide physical devices from other applications (HidHide on Windows).
+pub trait DeviceHider: Send + Sync {
     fn hide_device(&self, instance_path: &str) -> Result<()>;
-
-    /// Unhide a previously hidden device.
     fn unhide_device(&self, instance_path: &str) -> Result<()>;
-
-    /// Whitelist this application so it can still see hidden devices.
     fn whitelist_self(&self) -> Result<()>;
+}
 
-    /// Create a virtual XInput controller at the next available slot.
+/// Create/destroy virtual XInput controllers and forward gamepad state.
+pub trait VirtualControllerManager: Send + Sync {
     fn create_virtual_controller(&self) -> Result<u32>;
-
-    /// Destroy a virtual controller by its handle/index.
     fn destroy_virtual_controller(&self, index: u32) -> Result<()>;
-
-    /// Read the current state of a physical device.
     fn read_gamepad_state(&self, instance_path: &str) -> Result<GamepadState>;
-
-    /// Write gamepad state to a virtual controller.
     fn write_virtual_state(&self, index: u32, state: &GamepadState) -> Result<()>;
 }
+
+/// Combined trait for full platform support.
+pub trait PlatformServices: DeviceEnumerator + DeviceHider + VirtualControllerManager {}
+
+// Blanket impl: anything implementing all three sub-traits is a PlatformServices.
+impl<T: DeviceEnumerator + DeviceHider + VirtualControllerManager> PlatformServices for T {}
 
 #[cfg(target_os = "windows")]
 mod windows;
@@ -39,18 +36,18 @@ mod macos;
 #[cfg(target_os = "linux")]
 mod linux;
 
-/// Create the platform-appropriate ControllerManager.
-pub fn create_manager() -> Box<dyn ControllerManager> {
+/// Create the platform-appropriate service provider (singleton-friendly).
+pub fn create_platform() -> Arc<dyn PlatformServices> {
     #[cfg(target_os = "windows")]
     {
-        Box::new(windows::WindowsControllerManager::new())
+        Arc::new(windows::WindowsPlatform::new())
     }
     #[cfg(target_os = "macos")]
     {
-        Box::new(macos::MacOSControllerManager::new())
+        Arc::new(macos::MacOSPlatform::new())
     }
     #[cfg(target_os = "linux")]
     {
-        Box::new(linux::LinuxControllerManager::new())
+        Arc::new(linux::LinuxPlatform::new())
     }
 }

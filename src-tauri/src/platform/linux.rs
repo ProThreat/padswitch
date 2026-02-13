@@ -1,17 +1,17 @@
 use crate::device::{DriverStatus, GamepadState, PhysicalDevice};
 use crate::error::{PadSwitchError, Result};
-use crate::platform::ControllerManager;
+use crate::platform::{DeviceEnumerator, DeviceHider, VirtualControllerManager};
 
-/// Linux stub — future support via uinput / evdev.
-pub struct LinuxControllerManager;
+/// Linux stub -- future support via uinput / evdev.
+pub struct LinuxPlatform;
 
-impl LinuxControllerManager {
+impl LinuxPlatform {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl ControllerManager for LinuxControllerManager {
+impl DeviceEnumerator for LinuxPlatform {
     fn enumerate_devices(&self) -> Result<Vec<PhysicalDevice>> {
         Ok(vec![])
     }
@@ -19,7 +19,9 @@ impl ControllerManager for LinuxControllerManager {
     fn check_drivers(&self) -> Result<DriverStatus> {
         Ok(DriverStatus::default())
     }
+}
 
+impl DeviceHider for LinuxPlatform {
     fn hide_device(&self, _instance_path: &str) -> Result<()> {
         Err(PadSwitchError::PlatformNotSupported("Linux".into()))
     }
@@ -31,7 +33,9 @@ impl ControllerManager for LinuxControllerManager {
     fn whitelist_self(&self) -> Result<()> {
         Err(PadSwitchError::PlatformNotSupported("Linux".into()))
     }
+}
 
+impl VirtualControllerManager for LinuxPlatform {
     fn create_virtual_controller(&self) -> Result<u32> {
         Err(PadSwitchError::PlatformNotSupported("Linux".into()))
     }
