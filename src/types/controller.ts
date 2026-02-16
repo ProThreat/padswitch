@@ -9,6 +9,7 @@ export interface PhysicalDevice {
   connected: boolean;
   vendor_id: number;
   product_id: number;
+  xinput_slot: number | null;
 }
 
 export interface SlotAssignment {
@@ -33,9 +34,17 @@ export interface Profile {
   routing_mode: RoutingMode;
 }
 
+export interface GameRule {
+  id: string;
+  exe_name: string;
+  profile_id: string;
+  enabled: boolean;
+}
+
 export interface Settings {
   auto_start: boolean;
   start_minimized: boolean;
   auto_forward_on_launch: boolean;
+  auto_switch: boolean;
   active_profile_id: string | null;
 }

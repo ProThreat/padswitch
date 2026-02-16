@@ -10,15 +10,15 @@ pub enum DeviceType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhysicalDevice {
-    /// Unique ID for this device within PadSwitch
+    /// Unique ID for this device within PadSwitch (stable across sessions)
     pub id: String,
     /// Human-readable name (e.g., "Xbox Wireless Controller")
     pub name: String,
-    /// Device instance path (Windows) or IOKit path (macOS)
+    /// Real device instance path (e.g., "USB\VID_045E&PID_028E\6&ABC")
     pub instance_path: String,
     /// Type of input device
     pub device_type: DeviceType,
-    /// Whether the device is currently hidden from games
+    /// Whether the device is currently hidden/disabled
     pub hidden: bool,
     /// Whether the device is currently connected
     pub connected: bool,
@@ -26,6 +26,8 @@ pub struct PhysicalDevice {
     pub vendor_id: u16,
     /// Product ID
     pub product_id: u16,
+    /// Which XInput slot (0-3) this device currently occupies, if known
+    pub xinput_slot: Option<u32>,
 }
 
 impl PhysicalDevice {
@@ -39,10 +41,12 @@ impl PhysicalDevice {
             connected: true,
             vendor_id: 0,
             product_id: 0,
+            xinput_slot: None,
         }
     }
 
-    /// Create a PhysicalDevice representing a connected XInput slot.
+    /// Create a fallback PhysicalDevice for an XInput slot with no real device path.
+    /// Used when SetupAPI enumeration can't find the physical device.
     pub fn from_xinput_slot(slot: u32) -> Self {
         Self {
             id: format!("xinput-{}", slot),
@@ -53,6 +57,7 @@ impl PhysicalDevice {
             connected: true,
             vendor_id: 0,
             product_id: 0,
+            xinput_slot: Some(slot),
         }
     }
 }

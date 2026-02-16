@@ -3,6 +3,7 @@ interface StatusBarProps {
   deviceCount: number;
   onStartStop: () => void;
   onRefresh: () => void;
+  onReset: () => void;
 }
 
 export default function StatusBar({
@@ -10,6 +11,7 @@ export default function StatusBar({
   deviceCount,
   onStartStop,
   onRefresh,
+  onReset,
 }: StatusBarProps) {
   return (
     <div className="status-bar">
@@ -27,6 +29,13 @@ export default function StatusBar({
       </div>
 
       <div className="status-actions">
+        <button
+          className="btn btn-reset"
+          onClick={onReset}
+          title="Reset all controllers to default state"
+        >
+          Reset
+        </button>
         <button className="btn btn-secondary" onClick={onRefresh}>
           Refresh
         </button>

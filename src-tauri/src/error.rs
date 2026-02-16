@@ -20,6 +20,9 @@ pub enum PadSwitchError {
     #[error("Config error: {0}")]
     Config(String),
 
+    #[error("Platform error: {0}")]
+    Platform(String),
+
     #[error("Platform not supported: {0}")]
     PlatformNotSupported(String),
 

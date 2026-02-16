@@ -4,6 +4,7 @@ import type {
   PhysicalDevice,
   DriverStatus,
   Profile,
+  GameRule,
   SlotAssignment,
   RoutingMode,
 } from "../types/controller";
@@ -15,12 +16,23 @@ import {
   startForwarding,
   stopForwarding,
   isForwarding,
+  isElevated,
+  detectXInputSlot,
+  confirmDeviceSlot,
   getProfiles,
+  getGameRules,
+  addGameRule,
+  deleteGameRule,
+  toggleGameRule,
+  startProcessWatcher,
+  stopProcessWatcher,
+  isWatcherRunning,
   getSettings,
   saveProfile,
   activateProfile,
   deleteProfile,
   updateSettings,
+  resetAll,
 } from "../lib/ipc";
 import {
   onDeviceChange,
@@ -64,18 +76,25 @@ export function usePadSwitch() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [routingMode, setRoutingMode] = useState<RoutingMode>("Minimal");
+  const [gameRules, setGameRules] = useState<GameRule[]>([]);
+  const [watcherRunning, setWatcherRunning] = useState(false);
+  const [elevated, setElevated] = useState(true); // assume true until checked
+  const [identifying, setIdentifying] = useState<string | null>(null); // device ID being identified
   const [forwarding, setForwarding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [devs, drivers, fwd, loadedProfiles, settings] = await Promise.all([
+      const [devs, drivers, fwd, loadedProfiles, settings, elev, rules, watching] = await Promise.all([
         getConnectedDevices(),
         checkDriverStatus(),
         isForwarding(),
         getProfiles(),
         getSettings(),
+        isElevated(),
+        getGameRules(),
+        isWatcherRunning(),
       ]);
       const activeProfile = loadedProfiles.find(
         (profile) => profile.id === settings.active_profile_id
@@ -91,6 +110,9 @@ export function usePadSwitch() {
       setProfiles(loadedProfiles);
       setActiveProfileId(settings.active_profile_id);
       setRoutingMode(activeProfile?.routing_mode ?? "Minimal");
+      setElevated(elev);
+      setGameRules(rules);
+      setWatcherRunning(watching);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -117,8 +139,10 @@ export function usePadSwitch() {
     const unlistenProfile = onProfileActivated((payload) => {
       setActiveProfileId(payload.profile_id);
       setRoutingMode(payload.routing_mode);
-      setDevices((prev) => applyAssignmentsToDevices(prev, payload.assignments));
-      applyAssignments(payload.assignments).catch(console.error);
+      if (payload.profile_id) {
+        setDevices((prev) => applyAssignmentsToDevices(prev, payload.assignments));
+        applyAssignments(payload.assignments).catch(console.error);
+      }
     });
 
     return () => {
@@ -219,15 +243,106 @@ export function usePadSwitch() {
     [activeProfileId, profiles]
   );
 
+  const handleAddGameRule = useCallback(
+    async (exeName: string, profileId: string) => {
+      try {
+        const rule = await addGameRule(exeName, profileId);
+        setGameRules((prev) => [...prev, rule]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    []
+  );
+
+  const handleDeleteGameRule = useCallback(async (ruleId: string) => {
+    try {
+      await deleteGameRule(ruleId);
+      setGameRules((prev) => prev.filter((r) => r.id !== ruleId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const handleToggleGameRule = useCallback(
+    async (ruleId: string, enabled: boolean) => {
+      try {
+        await toggleGameRule(ruleId, enabled);
+        setGameRules((prev) =>
+          prev.map((r) => (r.id === ruleId ? { ...r, enabled } : r))
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    []
+  );
+
+  const handleToggleWatcher = useCallback(async (start: boolean) => {
+    try {
+      if (start) {
+        await startProcessWatcher();
+      } else {
+        await stopProcessWatcher();
+      }
+      setWatcherRunning(start);
+      // Persist the setting
+      const settings = await getSettings();
+      await updateSettings({ ...settings, auto_switch: start });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const handleIdentifyDevice = useCallback(async (deviceId: string) => {
+    try {
+      setIdentifying(deviceId);
+      const slot = await detectXInputSlot();
+      if (slot !== null) {
+        await confirmDeviceSlot(deviceId, slot);
+        setDevices((prev) =>
+          prev.map((d) =>
+            d.id === deviceId ? { ...d, xinput_slot: slot } : d
+          )
+        );
+      }
+      return slot;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setIdentifying(null);
+    }
+  }, []);
+
+  const handleReset = useCallback(async () => {
+    try {
+      await resetAll();
+      setForwarding(false);
+      setActiveProfileId(null);
+      setWatcherRunning(false);
+      setRoutingMode("Minimal");
+      // Refresh device list to show current (reset) state
+      const devs = await getConnectedDevices();
+      setDevices(devs);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
   const dismissError = useCallback(() => setError(null), []);
 
   return {
     devices,
     driverStatus,
+    elevated,
+    identifying,
     profiles,
     activeProfileId,
     routingMode,
     setRoutingMode,
+    gameRules,
+    watcherRunning,
     forwarding,
     loading,
     error,
@@ -236,8 +351,14 @@ export function usePadSwitch() {
     handleReorder,
     handleToggle,
     handleStartStop,
+    handleIdentifyDevice,
     handleSaveProfile,
     handleActivateProfile,
     handleDeleteProfile,
+    handleAddGameRule,
+    handleDeleteGameRule,
+    handleToggleGameRule,
+    handleToggleWatcher,
+    handleReset,
   };
 }

@@ -25,6 +25,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                             let _ = window.set_focus();
                         }
                     }
+                    "reset" => {
+                        reset_from_tray(app);
+                    }
                     "quit" => {
                         app.exit(0);
                     }
@@ -78,13 +81,65 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     }
 
     let show = MenuItem::with_id(app, "show", "Show PadSwitch", true, None::<&str>)?;
+    let reset = MenuItem::with_id(app, "reset", "Reset All Controllers", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
     builder
         .item(&show)
+        .item(&reset)
         .item(&PredefinedMenuItem::separator(app)?)
         .item(&quit)
         .build()
+}
+
+fn reset_from_tray(app: &AppHandle) {
+    let state: Option<tauri::State<'_, AppState>> = app.try_state();
+    let Some(state) = state else { return };
+
+    // Stop watcher
+    state.lock_watcher().stop();
+
+    // Stop forwarding
+    let manager = state.manager().clone();
+    {
+        let mut inner = state.lock_inner();
+        if inner.forwarding_active {
+            inner.input_loop.stop();
+            inner.forwarding_active = false;
+        }
+    }
+
+    // Re-enable and unhide all known devices
+    let device_paths: Vec<String> = {
+        let inner = state.lock_inner();
+        inner.devices.iter().map(|d| d.instance_path.clone()).collect()
+    };
+    for path in &device_paths {
+        let _ = manager.enable_device(path);
+        let _ = manager.unhide_device(path);
+    }
+    let _ = manager.deactivate_hiding();
+
+    // Clear active profile
+    {
+        let mut inner = state.lock_inner();
+        inner.config.settings.active_profile_id = None;
+        inner.assignments.clear();
+        let _ = inner.config.save();
+    }
+
+    let _ = app.emit("forwarding-status", serde_json::json!({ "active": false }));
+    let _ = app.emit(
+        "profile-activated",
+        serde_json::json!({
+            "profile_id": null,
+            "assignments": [],
+            "routing_mode": "Minimal",
+        }),
+    );
+
+    rebuild_tray_menu(app);
+    log::info!("Reset all from tray: complete");
 }
 
 fn activate_profile_from_tray(app: &AppHandle, profile_id: &str) {

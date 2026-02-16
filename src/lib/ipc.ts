@@ -4,6 +4,7 @@ import type {
   DriverStatus,
   SlotAssignment,
   Profile,
+  GameRule,
   Settings,
   RoutingMode,
 } from "../types/controller";
@@ -40,6 +41,38 @@ export const deleteProfile = (profileId: string) =>
 
 export const activateProfile = (profileId: string) =>
   invoke<SlotAssignment[]>("activate_profile", { profileId });
+
+// Environment
+export const isElevated = () => invoke<boolean>("is_elevated");
+
+// Device identification — polls XInput for button press, returns slot 0-3 or null
+export const detectXInputSlot = () => invoke<number | null>("detect_xinput_slot");
+
+// Confirm a device's XInput slot after identification
+export const confirmDeviceSlot = (deviceId: string, xinputSlot: number) =>
+  invoke<void>("confirm_device_slot", { deviceId, xinputSlot });
+
+// Game rules
+export const getGameRules = () => invoke<GameRule[]>("get_game_rules");
+
+export const addGameRule = (exeName: string, profileId: string) =>
+  invoke<GameRule>("add_game_rule", { exeName, profileId });
+
+export const deleteGameRule = (ruleId: string) =>
+  invoke<void>("delete_game_rule", { ruleId });
+
+export const toggleGameRule = (ruleId: string, enabled: boolean) =>
+  invoke<void>("toggle_game_rule", { ruleId, enabled });
+
+// Process watcher
+export const startProcessWatcher = () => invoke<void>("start_process_watcher");
+
+export const stopProcessWatcher = () => invoke<void>("stop_process_watcher");
+
+export const isWatcherRunning = () => invoke<boolean>("is_watcher_running");
+
+// Reset
+export const resetAll = () => invoke<void>("reset_all");
 
 // Settings
 export const getSettings = () => invoke<Settings>("get_settings");

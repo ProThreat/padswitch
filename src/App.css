@@ -579,6 +579,19 @@ body {
   background: var(--danger-hover);
 }
 
+.btn-reset {
+  background: transparent;
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.btn-reset:hover:not(:disabled) {
+  background: var(--warning);
+  color: #000;
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--text-secondary);
@@ -669,6 +682,163 @@ body {
 .about-close {
   margin-top: 16px;
   width: 100%;
+}
+
+/* === Game Rules === */
+.game-rules .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.watcher-toggle {
+  flex-shrink: 0;
+}
+
+.rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.rule-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.rule-card.rule-disabled {
+  opacity: 0.5;
+}
+
+.rule-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-exe {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rule-profile {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.rule-delete {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.rule-delete:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.add-rule-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.add-rule-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.add-rule-row input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.add-rule-row input:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+}
+
+.add-rule-row select {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 140px;
+}
+
+/* === Identify Banner === */
+.identify-banner {
+  padding: 10px 20px;
+  background: #1a2a1a;
+  border-bottom: 1px solid #2a4a2a;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  animation: identify-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes identify-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* === Identify Button === */
+.btn-identify {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--border);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-identify:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-identify:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* === Error Banner === */

@@ -19,11 +19,31 @@ pub struct Profile {
     pub routing_mode: RoutingMode,
 }
 
+/// A rule that maps a game executable to a preset profile.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameRule {
+    pub id: String,
+    /// Executable filename to match (e.g. "RocketLeague.exe"). Case-insensitive.
+    pub exe_name: String,
+    /// Which profile to activate when this game is running.
+    pub profile_id: String,
+    /// Whether this rule is active.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub auto_start: bool,
     pub start_minimized: bool,
     pub auto_forward_on_launch: bool,
+    /// Whether the process watcher is enabled (auto-switch presets on game launch).
+    #[serde(default)]
+    pub auto_switch: bool,
     pub active_profile_id: Option<String>,
 }
 
@@ -33,6 +53,7 @@ impl Default for Settings {
             auto_start: false,
             start_minimized: false,
             auto_forward_on_launch: false,
+            auto_switch: false,
             active_profile_id: None,
         }
     }
@@ -42,6 +63,8 @@ impl Default for Settings {
 pub struct AppConfig {
     pub settings: Settings,
     pub profiles: Vec<Profile>,
+    #[serde(default)]
+    pub game_rules: Vec<GameRule>,
 }
 
 impl Default for AppConfig {
@@ -49,6 +72,7 @@ impl Default for AppConfig {
         Self {
             settings: Settings::default(),
             profiles: vec![],
+            game_rules: vec![],
         }
     }
 }

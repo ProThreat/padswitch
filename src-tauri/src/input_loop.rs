@@ -1,9 +1,20 @@
 use crate::config::RoutingMode;
-use crate::device::SlotAssignment;
 use crate::error::Result;
 use crate::platform::PlatformServices;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+/// A slot assignment resolved to real device data for the input loop.
+/// Created by commands.rs from SlotAssignment + device list lookup.
+#[derive(Debug, Clone)]
+pub struct ResolvedAssignment {
+    /// Real device instance path (e.g., "USB\VID_045E&PID_028E\6&ABC")
+    pub instance_path: String,
+    /// XInput slot this device currently occupies (0-3), if known
+    pub xinput_slot: Option<u32>,
+    /// Target virtual slot (0-3)
+    pub target_slot: u8,
+}
 
 /// Manages the input forwarding loop.
 ///
@@ -24,11 +35,11 @@ impl InputLoop {
         }
     }
 
-    /// Start the forwarding loop with the given assignments and routing mode.
+    /// Start the forwarding loop with resolved assignments and routing mode.
     pub fn start(
         &mut self,
         manager: Arc<dyn PlatformServices>,
-        assignments: Vec<SlotAssignment>,
+        assignments: Vec<ResolvedAssignment>,
         mode: RoutingMode,
     ) -> Result<()> {
         if self.running.load(Ordering::SeqCst) {
@@ -80,7 +91,7 @@ impl Drop for InputLoop {
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "windows")]
-fn run_minimal(running: Arc<AtomicBool>, assignments: Vec<SlotAssignment>) {
+fn run_minimal(running: Arc<AtomicBool>, assignments: Vec<ResolvedAssignment>) {
     use crate::setupdi::imp;
 
     log::info!(
@@ -88,18 +99,16 @@ fn run_minimal(running: Arc<AtomicBool>, assignments: Vec<SlotAssignment>) {
         assignments.len()
     );
 
-    // Sort by target slot
+    // Sort by target slot so devices re-enable in the desired XInput order
     let mut sorted = assignments.clone();
-    sorted.sort_by_key(|a| a.slot);
+    sorted.sort_by_key(|a| a.target_slot);
 
-    // Collect instance paths (we use the convention XINPUT\SLOT{n})
-    let paths: Vec<String> = sorted
-        .iter()
-        .map(|a| format!("XINPUT\\SLOT{}", a.slot))
-        .collect();
+    // Use real instance paths for SetupDi operations
+    let paths: Vec<&str> = sorted.iter().map(|a| a.instance_path.as_str()).collect();
 
     // Step 1: Disable all assigned devices
     for path in &paths {
+        log::info!("Minimal mode: disabling {}", path);
         if let Err(e) = imp::disable_device(path) {
             log::error!("Failed to disable {}: {}", path, e);
         }
@@ -113,6 +122,7 @@ fn run_minimal(running: Arc<AtomicBool>, assignments: Vec<SlotAssignment>) {
         if !running.load(Ordering::SeqCst) {
             break;
         }
+        log::info!("Minimal mode: re-enabling {}", path);
         if let Err(e) = imp::enable_device(path) {
             log::error!("Failed to enable {}: {}", path, e);
         }
@@ -136,7 +146,7 @@ fn run_minimal(running: Arc<AtomicBool>, assignments: Vec<SlotAssignment>) {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn run_minimal(running: Arc<AtomicBool>, _assignments: Vec<SlotAssignment>) {
+fn run_minimal(running: Arc<AtomicBool>, _assignments: Vec<ResolvedAssignment>) {
     log::info!("Minimal mode: stub (non-Windows)");
     while running.load(Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -151,7 +161,7 @@ fn run_minimal(running: Arc<AtomicBool>, _assignments: Vec<SlotAssignment>) {
 fn run_force_forwarding(
     running: Arc<AtomicBool>,
     manager: Arc<dyn PlatformServices>,
-    assignments: Vec<SlotAssignment>,
+    assignments: Vec<ResolvedAssignment>,
 ) {
     use crate::hidhide::imp::HidHide;
     use crate::vigem::imp::to_xgamepad;
@@ -163,7 +173,7 @@ fn run_force_forwarding(
 
     // Sort assignments by target slot
     let mut sorted = assignments.clone();
-    sorted.sort_by_key(|a| a.slot);
+    sorted.sort_by_key(|a| a.target_slot);
 
     // Step 1: Whitelist ourselves so we can still read hidden devices
     if let Err(e) = manager.whitelist_self() {
@@ -172,13 +182,11 @@ fn run_force_forwarding(
         return;
     }
 
-    // Step 2: Hide all assigned physical devices
-    let instance_paths: Vec<String> = sorted
-        .iter()
-        .map(|a| format!("XINPUT\\SLOT{}", a.slot))
-        .collect();
+    // Step 2: Hide all assigned physical devices using real instance paths
+    let instance_paths: Vec<String> = sorted.iter().map(|a| a.instance_path.clone()).collect();
 
     for path in &instance_paths {
+        log::info!("Force mode: hiding {}", path);
         if let Err(e) = manager.hide_device(path) {
             log::error!("Failed to hide {}: {}", path, e);
         }
@@ -237,10 +245,13 @@ fn run_force_forwarding(
 
     log::info!("Force mode: forwarding loop active");
 
-    // Step 7: Poll loop at ~1000Hz
+    // Step 7: Poll loop at ~1000Hz — read from real XInput slots, write to virtual targets
     while running.load(Ordering::SeqCst) {
-        for (i, assignment) in sorted.iter().enumerate() {
-            if let Ok(state) = xinput.get_state(assignment.slot as u32) {
+        for (i, ra) in sorted.iter().enumerate() {
+            let Some(slot) = ra.xinput_slot else {
+                continue; // Skip devices without a known XInput slot
+            };
+            if let Ok(state) = xinput.get_state(slot) {
                 let gamepad = crate::device::GamepadState {
                     buttons: state.raw.Gamepad.wButtons,
                     left_trigger: state.raw.Gamepad.bLeftTrigger,
@@ -285,7 +296,7 @@ fn cleanup_force(manager: &Arc<dyn PlatformServices>, instance_paths: &[String])
 fn run_force_forwarding(
     running: Arc<AtomicBool>,
     _manager: Arc<dyn PlatformServices>,
-    _assignments: Vec<SlotAssignment>,
+    _assignments: Vec<ResolvedAssignment>,
 ) {
     log::info!("Force mode: stub (non-Windows)");
     while running.load(Ordering::SeqCst) {

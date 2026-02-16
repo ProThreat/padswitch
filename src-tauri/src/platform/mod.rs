@@ -9,10 +9,20 @@ pub trait DeviceEnumerator: Send + Sync {
 }
 
 /// Hide/unhide physical devices from other applications (HidHide on Windows).
+/// Also disable/enable devices via OS-level APIs (SetupDi on Windows).
 pub trait DeviceHider: Send + Sync {
+    /// Hide a device via HidHide (force mode). Requires HidHide driver.
     fn hide_device(&self, instance_path: &str) -> Result<()>;
+    /// Unhide a device via HidHide (force mode).
     fn unhide_device(&self, instance_path: &str) -> Result<()>;
+    /// Add our process to HidHide whitelist so we can still read hidden devices.
     fn whitelist_self(&self) -> Result<()>;
+    /// Disable a device via OS APIs (minimal mode). May require admin.
+    fn disable_device(&self, instance_path: &str) -> Result<()>;
+    /// Enable a device via OS APIs (minimal mode).
+    fn enable_device(&self, instance_path: &str) -> Result<()>;
+    /// Deactivate the hiding driver globally (HidHide on Windows). No-op on other platforms.
+    fn deactivate_hiding(&self) -> Result<()>;
 }
 
 /// Create/destroy virtual XInput controllers and forward gamepad state.
@@ -49,5 +59,19 @@ pub fn create_platform() -> Arc<dyn PlatformServices> {
     #[cfg(target_os = "linux")]
     {
         Arc::new(linux::LinuxPlatform::new())
+    }
+}
+
+/// Check whether the current process is running with admin/elevated privileges.
+/// Minimal mode (SetupDi disable/enable) requires elevation on Windows.
+pub fn is_elevated() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        unsafe { windows::Win32::UI::Shell::IsUserAnAdmin().as_bool() }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        // On macOS/Linux, elevation isn't required for the current feature set
+        true
     }
 }

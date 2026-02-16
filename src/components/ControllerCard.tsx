@@ -5,24 +5,28 @@ import type { PhysicalDevice } from "../types/controller";
 interface ControllerCardProps {
   device: PhysicalDevice;
   slot: number;
+  identifying: boolean;
   onToggle: (deviceId: string, hidden: boolean) => void;
+  onIdentify: (deviceId: string) => void;
 }
 
 function deviceIcon(type: string): string {
   switch (type) {
     case "XInput":
-      return "🎮";
+      return "\uD83C\uDFAE";
     case "DirectInput":
-      return "🕹️";
+      return "\uD83D\uDD79\uFE0F";
     default:
-      return "🔌";
+      return "\uD83D\uDD0C";
   }
 }
 
 export default function ControllerCard({
   device,
   slot,
+  identifying,
   onToggle,
+  onIdentify,
 }: ControllerCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: device.id });
@@ -59,6 +63,9 @@ export default function ControllerCard({
         <div className="card-name">{device.name}</div>
         <div className="card-meta">
           <span className="card-type">{device.device_type}</span>
+          {device.xinput_slot !== null && (
+            <span className="card-type">Slot {device.xinput_slot}</span>
+          )}
           {!device.connected && (
             <span className="card-status disconnected">Disconnected</span>
           )}
@@ -67,6 +74,17 @@ export default function ControllerCard({
           )}
         </div>
       </div>
+
+      {device.device_type === "XInput" && (
+        <button
+          className="btn-identify"
+          onClick={() => onIdentify(device.id)}
+          disabled={identifying}
+          title="Press a button on this controller to identify its XInput slot"
+        >
+          {identifying ? "..." : "ID"}
+        </button>
+      )}
 
       <label className="card-toggle">
         <input

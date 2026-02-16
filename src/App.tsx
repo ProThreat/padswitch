@@ -5,19 +5,24 @@ import DriverStatus from "./components/DriverStatus";
 import StatusBar from "./components/StatusBar";
 import AboutPanel from "./components/AboutPanel";
 import PresetList from "./components/PresetList";
+import GameRules from "./components/GameRules";
 import type { RoutingMode } from "./types/controller";
 import "./App.css";
 
-type Tab = "presets" | "manual";
+type Tab = "presets" | "manual" | "auto";
 
 function App() {
   const {
     devices,
     driverStatus,
+    elevated,
+    identifying,
     profiles,
     activeProfileId,
     routingMode,
     setRoutingMode,
+    gameRules,
+    watcherRunning,
     forwarding,
     loading,
     error,
@@ -26,9 +31,15 @@ function App() {
     handleReorder,
     handleToggle,
     handleStartStop,
+    handleIdentifyDevice,
     handleSaveProfile,
     handleActivateProfile,
     handleDeleteProfile,
+    handleAddGameRule,
+    handleDeleteGameRule,
+    handleToggleGameRule,
+    handleToggleWatcher,
+    handleReset,
   } = usePadSwitch();
 
   const [tab, setTab] = useState<Tab>("presets");
@@ -72,7 +83,13 @@ function App() {
         </div>
       )}
 
-      <DriverStatus status={driverStatus} />
+      <DriverStatus status={driverStatus} routingMode={routingMode} elevated={elevated} />
+
+      {identifying && (
+        <div className="identify-banner">
+          Press any button on the controller to identify it...
+        </div>
+      )}
 
       <nav className="tab-bar">
         <button
@@ -87,6 +104,12 @@ function App() {
         >
           Manual
         </button>
+        <button
+          className={`tab-btn${tab === "auto" ? " tab-active" : ""}`}
+          onClick={() => setTab("auto")}
+        >
+          Auto
+        </button>
       </nav>
 
       <div className="app-body">
@@ -99,6 +122,18 @@ function App() {
           />
         )}
 
+        {tab === "auto" && (
+          <GameRules
+            rules={gameRules}
+            profiles={profiles}
+            watcherRunning={watcherRunning}
+            onAddRule={handleAddGameRule}
+            onDeleteRule={handleDeleteGameRule}
+            onToggleRule={handleToggleGameRule}
+            onToggleWatcher={handleToggleWatcher}
+          />
+        )}
+
         {tab === "manual" && (
           <>
             <div className="section-header">
@@ -108,8 +143,10 @@ function App() {
 
             <ControllerList
               devices={devices}
+              identifying={identifying}
               onReorder={handleReorder}
               onToggle={handleToggle}
+              onIdentify={handleIdentifyDevice}
             />
 
             <section className="save-preset-section">
@@ -156,6 +193,7 @@ function App() {
         deviceCount={devices.length}
         onStartStop={handleStartStop}
         onRefresh={refresh}
+        onReset={handleReset}
       />
 
       <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />

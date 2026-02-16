@@ -11,7 +11,7 @@ export interface ForwardingStatusPayload {
 }
 
 export interface ProfileActivatedPayload {
-  profile_id: string;
+  profile_id: string | null;
   assignments: SlotAssignment[];
   routing_mode: RoutingMode;
 }

@@ -21,14 +21,18 @@ import ControllerCard from "./ControllerCard";
 
 interface ControllerListProps {
   devices: PhysicalDevice[];
+  identifying: string | null;
   onReorder: (activeId: string, overId: string) => void;
   onToggle: (deviceId: string, hidden: boolean) => void;
+  onIdentify: (deviceId: string) => void;
 }
 
 export default function ControllerList({
   devices,
+  identifying,
   onReorder,
   onToggle,
+  onIdentify,
 }: ControllerListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -73,7 +77,9 @@ export default function ControllerList({
               key={device.id}
               device={device}
               slot={index}
+              identifying={identifying === device.id}
               onToggle={onToggle}
+              onIdentify={onIdentify}
             />
           ))}
         </div>

@@ -23,6 +23,7 @@ impl DeviceEnumerator for MacOSPlatform {
                 connected: true,
                 vendor_id: 0x31E3,
                 product_id: 0x1100,
+                xinput_slot: Some(0),
             },
             PhysicalDevice {
                 id: "mock-xbox-controller".into(),
@@ -33,6 +34,7 @@ impl DeviceEnumerator for MacOSPlatform {
                 connected: true,
                 vendor_id: 0x045E,
                 product_id: 0x0B12,
+                xinput_slot: Some(1),
             },
             PhysicalDevice {
                 id: "mock-ps5-dualsense".into(),
@@ -43,6 +45,7 @@ impl DeviceEnumerator for MacOSPlatform {
                 connected: true,
                 vendor_id: 0x054C,
                 product_id: 0x0CE6,
+                xinput_slot: None,
             },
         ])
     }
@@ -70,6 +73,21 @@ impl DeviceHider for MacOSPlatform {
 
     fn whitelist_self(&self) -> Result<()> {
         log::info!("[macOS stub] whitelist_self");
+        Ok(())
+    }
+
+    fn disable_device(&self, instance_path: &str) -> Result<()> {
+        log::info!("[macOS stub] disable_device: {}", instance_path);
+        Ok(())
+    }
+
+    fn enable_device(&self, instance_path: &str) -> Result<()> {
+        log::info!("[macOS stub] enable_device: {}", instance_path);
+        Ok(())
+    }
+
+    fn deactivate_hiding(&self) -> Result<()> {
+        log::info!("[macOS stub] deactivate_hiding");
         Ok(())
     }
 }

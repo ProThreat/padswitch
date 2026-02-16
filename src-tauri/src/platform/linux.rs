@@ -33,6 +33,18 @@ impl DeviceHider for LinuxPlatform {
     fn whitelist_self(&self) -> Result<()> {
         Err(PadSwitchError::PlatformNotSupported("Linux".into()))
     }
+
+    fn disable_device(&self, _instance_path: &str) -> Result<()> {
+        Err(PadSwitchError::PlatformNotSupported("Linux".into()))
+    }
+
+    fn enable_device(&self, _instance_path: &str) -> Result<()> {
+        Err(PadSwitchError::PlatformNotSupported("Linux".into()))
+    }
+
+    fn deactivate_hiding(&self) -> Result<()> {
+        Ok(()) // No hiding driver on Linux
+    }
 }
 
 impl VirtualControllerManager for LinuxPlatform {
