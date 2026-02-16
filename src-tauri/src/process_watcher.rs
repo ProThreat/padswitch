@@ -254,8 +254,27 @@ fn list_running_processes() -> Vec<String> {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
 fn list_running_processes() -> Vec<String> {
-    // Stub for macOS/Linux dev — no process watching
+    let mut names = Vec::new();
+    if let Ok(entries) = std::fs::read_dir("/proc") {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if name.to_string_lossy().chars().all(|c| c.is_ascii_digit()) {
+                let comm_path = entry.path().join("comm");
+                if let Ok(comm) = std::fs::read_to_string(&comm_path) {
+                    let trimmed = comm.trim().to_string();
+                    if !trimmed.is_empty() {
+                        names.push(trimmed);
+                    }
+                }
+            }
+        }
+    }
+    names
+}
+
+#[cfg(target_os = "macos")]
+fn list_running_processes() -> Vec<String> {
     vec![]
 }

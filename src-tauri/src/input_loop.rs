@@ -145,9 +145,17 @@ fn run_minimal(running: Arc<AtomicBool>, assignments: Vec<ResolvedAssignment>) {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
 fn run_minimal(running: Arc<AtomicBool>, _assignments: Vec<ResolvedAssignment>) {
-    log::info!("Minimal mode: stub (non-Windows)");
+    // Minimal mode is not supported on Linux — the preflight check in state.rs
+    // should already block this, but log an error defensively.
+    log::error!("Minimal mode is not supported on Linux. Use Force mode instead.");
+    running.store(false, Ordering::SeqCst);
+}
+
+#[cfg(target_os = "macos")]
+fn run_minimal(running: Arc<AtomicBool>, _assignments: Vec<ResolvedAssignment>) {
+    log::info!("Minimal mode: stub (macOS)");
     while running.load(Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
@@ -292,13 +300,167 @@ fn cleanup_force(manager: &Arc<dyn PlatformServices>, instance_paths: &[String])
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
+fn run_force_forwarding(
+    running: Arc<AtomicBool>,
+    _manager: Arc<dyn PlatformServices>,
+    assignments: Vec<ResolvedAssignment>,
+) {
+    use evdev::uinput::VirtualDeviceBuilder;
+    use evdev::{AbsoluteAxisCode, AbsInfo, UinputAbsSetup, InputEvent, EventType};
+
+    log::info!(
+        "Force mode (Linux): starting with {} assignments",
+        assignments.len()
+    );
+
+    // Sort assignments by target slot so virtual devices are created in P1, P2, ... order
+    let mut sorted = assignments.clone();
+    sorted.sort_by_key(|a| a.target_slot);
+
+    // Step 1: Open and grab all physical devices
+    let mut physical_devices: Vec<evdev::Device> = Vec::new();
+    for ra in &sorted {
+        let mut device = match evdev::Device::open(&ra.instance_path) {
+            Ok(d) => d,
+            Err(e) => {
+                log::error!("Failed to open {}: {}", ra.instance_path, e);
+                // Release any already-grabbed devices
+                drop(physical_devices);
+                running.store(false, Ordering::SeqCst);
+                return;
+            }
+        };
+
+        // EVIOCGRAB — exclusive access, other apps (games) won't see this device
+        if let Err(e) = device.grab() {
+            log::error!("Failed to grab {}: {}", ra.instance_path, e);
+            drop(physical_devices);
+            running.store(false, Ordering::SeqCst);
+            return;
+        }
+        log::info!("Grabbed: {} ({})", ra.instance_path, device.name().unwrap_or("?"));
+
+        physical_devices.push(device);
+    }
+
+    // Step 2: Create virtual uinput devices, one per physical device, in slot order
+    let mut virtual_devices: Vec<evdev::uinput::VirtualDevice> = Vec::new();
+    for (i, phys) in physical_devices.iter().enumerate() {
+        let virt_name = format!("PadSwitch Virtual Controller {}", i + 1);
+        let mut builder = VirtualDeviceBuilder::new()
+            .map_err(|e| {
+                log::error!("Failed to create VirtualDeviceBuilder: {}", e);
+            });
+
+        let mut builder = match builder {
+            Ok(b) => b,
+            Err(()) => {
+                drop(virtual_devices);
+                drop(physical_devices);
+                running.store(false, Ordering::SeqCst);
+                return;
+            }
+        };
+
+        builder = builder.name(&virt_name);
+
+        // Copy supported keys from physical device
+        if let Some(keys) = phys.supported_keys() {
+            builder = builder.with_keys(&keys).unwrap_or(builder);
+        }
+
+        // Copy absolute axes with their ranges from physical device
+        if let Some(abs_axes) = phys.supported_absolute_axes() {
+            for axis in abs_axes.iter() {
+                if let Some(info) = phys.get_absinfo(&axis) {
+                    let setup = UinputAbsSetup::new(
+                        axis,
+                        AbsInfo::new(
+                            info.value(),
+                            info.minimum(),
+                            info.maximum(),
+                            info.fuzz(),
+                            info.flat(),
+                            info.resolution(),
+                        ),
+                    );
+                    builder = builder.with_absolute_axis(&setup).unwrap_or(builder);
+                }
+            }
+        }
+
+        match builder.build() {
+            Ok(vd) => {
+                log::info!("Created virtual device: {}", virt_name);
+                virtual_devices.push(vd);
+            }
+            Err(e) => {
+                log::error!("Failed to build virtual device {}: {}", virt_name, e);
+                drop(virtual_devices);
+                drop(physical_devices);
+                running.store(false, Ordering::SeqCst);
+                return;
+            }
+        }
+    }
+
+    log::info!("Force mode (Linux): forwarding loop active — {} devices", sorted.len());
+
+    // Step 3: Poll loop — read events from physical devices and forward to virtual devices
+    // Use non-blocking reads with short sleep (~1ms) for low latency
+    for phys in &mut physical_devices {
+        if let Err(e) = phys.set_nonblocking(true) {
+            log::warn!("Failed to set non-blocking on {}: {}", phys.name().unwrap_or("?"), e);
+        }
+    }
+
+    while running.load(Ordering::SeqCst) {
+        let mut had_events = false;
+
+        for (i, phys) in physical_devices.iter_mut().enumerate() {
+            match phys.fetch_events() {
+                Ok(events) => {
+                    let events: Vec<InputEvent> = events.collect();
+                    if !events.is_empty() {
+                        had_events = true;
+                        if let Err(e) = virtual_devices[i].emit(&events) {
+                            log::warn!("Failed to emit events to virtual device {}: {}", i, e);
+                        }
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    // No events available — normal for non-blocking
+                }
+                Err(e) => {
+                    log::warn!("Error reading from physical device {}: {}", i, e);
+                }
+            }
+        }
+
+        // Sleep briefly to avoid busy-spinning; ~1ms matches the Windows 1000Hz rate
+        if !had_events {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    log::info!("Force mode (Linux): stopping — releasing devices");
+
+    // Step 4: Cleanup — dropping virtual_devices unplugs them, dropping physical_devices
+    // releases the EVIOCGRAB. Explicit drop for clarity.
+    drop(virtual_devices);
+    drop(physical_devices);
+
+    log::info!("Force mode (Linux): cleanup complete");
+}
+
+#[cfg(target_os = "macos")]
 fn run_force_forwarding(
     running: Arc<AtomicBool>,
     _manager: Arc<dyn PlatformServices>,
     _assignments: Vec<ResolvedAssignment>,
 ) {
-    log::info!("Force mode: stub (non-Windows)");
+    log::info!("Force mode: stub (macOS)");
     while running.load(Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(500));
     }

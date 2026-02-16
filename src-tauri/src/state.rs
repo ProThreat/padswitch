@@ -104,6 +104,12 @@ impl Inner {
     ) -> crate::error::Result<()> {
         match mode {
             RoutingMode::Minimal => {
+                #[cfg(target_os = "linux")]
+                return Err(crate::error::PadSwitchError::Platform(
+                    "Minimal mode is not supported on Linux. Use Force mode instead.".into(),
+                ));
+
+                #[cfg(not(target_os = "linux"))]
                 if !crate::platform::is_elevated() {
                     return Err(crate::error::PadSwitchError::Platform(
                         "Minimal mode requires administrator privileges. Restart PadSwitch as Administrator.".into(),
